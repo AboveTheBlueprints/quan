@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>泉</title>
+<style>
+  body { margin: 0; background: #f1ede2; color: #34312a; font-family: "PingFang SC", "Noto Sans SC", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 20px 18px 280px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 12px; }
+  .open p { margin: 0 0 10px; line-height: 1.7; }
+  #top { position: sticky; top: 0; background: #f1ede2; padding: 4px 0 2px; z-index: 2; }
+  #hill { width: 100%; height: auto; display: block; }
+  #log { margin-top: 14px; line-height: 1.75; }
+  #log .ln { margin: 0 0 4px; }
+  #log .yr { margin-top: 18px; font-weight: 600; color: #5a5038; }
+  #log .me { color: #8a7a52; }
+  #log table.tab { border-collapse: collapse; margin: 4px 0 10px; font-size: 14px; }
+  #log table.tab th, #log table.tab td { padding: 2px 7px; text-align: center; font-weight: normal; }
+  #log table.tab tr:first-child th { color: #7d745c; font-size: 12px; }
+  #log table.tab tr th:first-child { text-align: left; color: #5a5038; }
+  #log .last { background: #e7e0cc; border-radius: 6px; padding: 3px 8px; margin-left: -8px; margin-right: -8px; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; background: #e9e3d2; border-top: 1px solid #cfc6ab; }
+  #bar .in { max-width: 680px; margin: 0 auto; padding: 10px 18px 14px; }
+  #ask { margin-bottom: 8px; font-weight: 600; color: #4f4630; }
+  button { font: inherit; font-size: 15px; padding: 6px 12px; margin: 0 6px 6px 0; border: 1px solid #a3966f; background: #fbf9f2; color: #34312a; border-radius: 6px; cursor: pointer; }
+  button:hover { background: #fff; }
+  button:disabled { color: #b7af98; border-color: #d8d0b8; background: #f3efe3; cursor: default; }
+  button.go { border-color: #6f8a5a; }
+  button.quiet { border-color: #cbc2a6; color: #8d8670; font-size: 13px; padding: 5px 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>泉</h1>
+  <div class="open">
+    <p>1913 年，普罗旺斯的荒山。一个不太说话的牧羊人，每天晚上挑一百颗橡子，白天拿铁棍在山上戳洞种下去。</p>
+    <p>我隔好几年才回山上一次。每回你替他挑在哪儿种。</p>
+  </div>
+  <div id="top"><svg id="hill" viewBox="0 0 680 210"></svg></div>
+  <div id="log"></div>
+</main>
+<div id="bar"><div class="in">
+  <div id="ask"></div>
+  <div id="btns"></div>
+</div></div>
+<script src="sim.js"></script>
+<script>
+var acts = [];
+try { var s0 = JSON.parse(localStorage.getItem('quan') || 'null'); if (s0 && s0.acts) acts = s0.acts; } catch (e) {}
+var logEl = document.getElementById('log'), askEl = document.getElementById('ask'), btnEl = document.getElementById('btns'), svg = document.getElementById('hill');
+function save() { try { localStorage.setItem('quan', JSON.stringify({ acts: acts })); } catch (e) {} }
+function mk(tag, attrs, txt) { var e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (txt) e.textContent = txt; return e; }
+
+// 山脊：七格从左（北）到右（南），北高南低
+var X0 = 40, W = 86;
+function gy(c) { return 70 + c * 9; }          // 这一格地面的高
+function cx(c) { return X0 + c * W + W / 2; }
+function tree(x, y, h, col) {
+  svg.appendChild(mk('line', { x1: x, y1: y, x2: x, y2: y - h * 0.45, stroke: '#6b5a40', 'stroke-width': Math.max(1.5, h / 14) }));
+  svg.appendChild(mk('ellipse', { cx: x, cy: y - h * 0.62, rx: h * 0.32, ry: h * 0.36, fill: col }));
+}
+function draw(g) {
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  svg.appendChild(mk('rect', { x: 0, y: 0, width: 680, height: 210, fill: '#e9e1c9' }));
+  // 地
+  var d = 'M0 ' + gy(0);
+  for (var c = 0; c < 7; c++) d += ' L' + (X0 + c * W) + ' ' + gy(c) + ' L' + (X0 + (c + 1) * W) + ' ' + gy(c);
+  d += ' L680 ' + gy(6) + ' L680 210 L0 210 Z';
+  svg.appendChild(mk('path', { d: d, fill: '#cdbf98' }));
+  // 风
+  for (var w = 0; w < 3; w++) {
+    var wy = 26 + w * 14;
+    svg.appendChild(mk('path', { d: 'M6 ' + wy + ' q 14 -5 28 0 q 10 4 18 0', stroke: '#9b9277', 'stroke-width': 1.5, fill: 'none' }));
+    svg.appendChild(mk('path', { d: 'M48 ' + (wy - 3) + ' l 5 3 l -5 3', stroke: '#9b9277', 'stroke-width': 1.5, fill: 'none' }));
+  }
+  svg.appendChild(mk('text', { x: 6, y: 16, 'font-size': 11, fill: '#7d745c' }, '北'));
+  svg.appendChild(mk('text', { x: 664, y: 16, 'font-size': 11, fill: '#7d745c' }, '南'));
+  // 每格
+  for (c = 0; c < 7; c++) {
+    var x = cx(c), y = gy(c), a = g.age[c];
+    svg.appendChild(mk('text', { x: x, y: y + 18, 'font-size': 12, fill: '#6e6550', 'text-anchor': 'middle' }, COLS[c]));
+    if (c === 1) { // 礼拜堂残墙
+      svg.appendChild(mk('rect', { x: x - W / 2 + 4, y: y - 26, width: 8, height: 26, fill: '#a39a86' }));
+      svg.appendChild(mk('path', { d: 'M' + (x - W / 2 + 4) + ' ' + (y - 26) + ' l 4 -10 l 4 10 Z', fill: '#a39a86' }));
+    }
+    if (c === 3) { // 残房子
+      svg.appendChild(mk('path', { d: 'M' + (x - 36) + ' ' + y + ' v -16 h 14 v 10 h 3 v 6 Z', fill: '#b0a58c' }));
+      svg.appendChild(mk('path', { d: 'M' + (x + 22) + ' ' + y + ' v -12 h 12 v 12 Z', fill: '#b0a58c' }));
+    }
+    if (c === 4) {
+      if (g.sheep) {
+        svg.appendChild(mk('path', { d: 'M' + (x - 38) + ' ' + (y - 8) + ' h 22 M' + (x - 38) + ' ' + (y - 3) + ' h 22', stroke: '#8a7d5e', 'stroke-width': 1.2 }));
+        for (var s = 0; s < 5; s++) svg.appendChild(mk('ellipse', { cx: x - 34 + s * 4.5, cy: y - 5 - (s % 2) * 3, rx: 3, ry: 2.2, fill: '#f6f2e6', stroke: '#9a907a', 'stroke-width': 0.6 }));
+      } else {
+        for (s = 0; s < 3; s++) svg.appendChild(mk('rect', { x: x - 38 + s * 8, y: y - 8, width: 6, height: 8, fill: '#d9b25a', stroke: '#9a7a35', 'stroke-width': 0.6 }));
+      }
+    }
+    var tr = g.trace[c];
+    if (a === null && tr) {
+      for (s = 0; s < 4; s++) {
+        var sx = x - 15 + s * 10;
+        if (tr[0] === '砍') svg.appendChild(mk('rect', { x: sx - 2.5, y: y - 4, width: 5, height: 4, fill: '#8a7350' }));
+        else svg.appendChild(mk('line', { x1: sx, y1: y, x2: sx + (tr[0] === '风' ? 6 : 0), y2: y - (tr[0] === '风' ? 2 : 4), stroke: '#8f7b55', 'stroke-width': 1.3 }));
+      }
+    }
+    if (a !== null) {
+      var col = g.by[c] === 'village' ? '#7fa36a' : '#6f9b5c';
+      if (a < 3) { for (s = 0; s < 5; s++) svg.appendChild(mk('path', { d: 'M' + (x - 18 + s * 9) + ' ' + y + ' l 0 -4 m 0 0 l -2 -2 m 2 2 l 2 -2', stroke: '#6f9b5c', 'stroke-width': 1.2, fill: 'none' })); }
+      else if (a < 8) { var h = a < 5 ? 14 : 22; [-18, 0, 18].forEach(function (o) { tree(x + o, y, h, col); }); }
+      else if (a < 15) { [-28, -10, 8, 26].forEach(function (o, i) { tree(x + o, y, 32 + (i % 2) * 6, i % 2 ? '#5f8c4e' : col); }); }
+      else { [-30, -14, 2, 18, 32].forEach(function (o, i) { tree(x + o, y, 46 + (i % 3) * 5, i % 2 ? '#4f7d43' : '#5a8a4b'); }); }
+      if (g.by[c] === 'village') svg.appendChild(mk('path', { d: 'M' + (x - 36) + ' ' + (y - 6) + ' h 72', stroke: '#8a7d5e', 'stroke-width': 1, 'stroke-dasharray': '2 3' }));
+    }
+  }
+  // 两口水
+  var lv = function (k) { var n = 0; WELL[k].forEach(function (c) { if (g.age[c] !== null && g.age[c] >= 10) n++; }); return n; };
+  var WC = ['#c9b78f', '#a08c66', '#6aa3b8'];
+  var px = cx(3), py = gy(3) + 34;
+  svg.appendChild(mk('ellipse', { cx: px, cy: py, rx: 18, ry: 6, fill: WC[lv('废村的泉')] }));
+  svg.appendChild(mk('text', { x: px, y: py + 20, 'font-size': 11, fill: '#6e6550', 'text-anchor': 'middle' }, '废村的泉'));
+  if (lv('废村的泉') === 2) svg.appendChild(mk('path', { d: 'M' + (px + 18) + ' ' + py + ' q 20 4 40 14', stroke: '#6aa3b8', 'stroke-width': 2, fill: 'none' }));
+  if (g.people['废村的泉']) { tree(px - 28, py + 2, 26, '#8fb36b'); svg.appendChild(mk('path', { d: 'M' + (px - 40) + ' ' + (py + 2) + ' h 24', stroke: '#8a7d5e', 'stroke-dasharray': '2 3' })); }
+  var kx = cx(6), ky = gy(6) + 44;
+  svg.appendChild(mk('rect', { x: kx - 10, y: ky - 6, width: 20, height: 9, rx: 2, fill: WC[lv('炭窑村的井')], stroke: '#8a7d5e', 'stroke-width': 0.8 }));
+  svg.appendChild(mk('text', { x: kx, y: ky + 20, 'font-size': 11, fill: '#6e6550', 'text-anchor': 'middle' }, '炭窑村的井'));
+  // 石槽：从井往北
+  svg.appendChild(mk('path', { d: 'M' + (kx - 10) + ' ' + (ky - 2) + ' L' + (kx - 70) + ' ' + (ky - 8), stroke: '#a39a86', 'stroke-width': 3, 'stroke-dasharray': '10 6' }));
+  // 炭窑村的房子
+  var hc = g.people['炭窑村的井'] ? '#c98f6a' : '#a8957a';
+  for (s = 0; s < 3; s++) {
+    var hx = kx + 18 + s * 14;
+    svg.appendChild(mk('rect', { x: hx, y: ky - 10, width: 11, height: 9, fill: hc }));
+    svg.appendChild(mk('path', { d: 'M' + (hx - 1) + ' ' + (ky - 10) + ' l 6.5 -5 l 6.5 5 Z', fill: '#7a6a52' }));
+  }
+  if (g.people['炭窑村的井']) for (s = 0; s < 4; s++) svg.appendChild(mk('circle', { cx: kx - 30 + s * 6, cy: ky + 4, r: 2, fill: '#7fa36a' }));
+  // 年份、橡子
+  var yr = VISITS[Math.min(g.vi, VISITS.length - 1)];
+  svg.appendChild(mk('text', { x: 340, y: 18, 'font-size': 15, fill: '#4f4630', 'text-anchor': 'middle', 'font-weight': 600 }, yr + ' 年'));
+  if (!g.done) svg.appendChild(mk('text', { x: 340, y: 34, 'font-size': 12, fill: '#7d745c', 'text-anchor': 'middle' }, '橡子还有 ' + g.bags + ' 袋'));
+}
+
+function render() {
+  var r = run(acts), g = r.g, lines = r.lines;
+  logEl.innerHTML = '';
+  var inTab = false;
+  for (var i = 0; i < lines.length; i++) {
+    var t = lines[i];
+    if (t === '') { inTab = false; continue; }
+    if (/^能做的：/.test(t)) continue;
+    var d = document.createElement('div');
+    d.className = 'ln';
+    var shown = t;
+    if (/^== /.test(t)) { d.className += ' yr'; shown = t.replace(/=/g, '').trim(); }
+    if (/^> /.test(t)) {
+      d.className += ' me';
+      var a = t.slice(2);
+      shown = '你：' + (a === '走' ? '让我下山，过几年再来' : a === '换蜂' ? '把羊卖了换蜂箱' : a);
+    }
+    if (inTab) continue;
+    d.textContent = shown;
+    logEl.appendChild(d);
+    if (/^我把几回看到的/.test(t)) {
+      inTab = true;
+      var tb = document.createElement('table'); tb.className = 'tab';
+      var hr = '<tr><td></td>' + VISITS.map(function (y) { return '<th>' + y + '</th>'; }).join('') + '</tr>';
+      var rows = COLS.map(function (n, c) { return '<tr><th>' + n + '</th>' + g.snaps.map(function (sn) { return '<td>' + sn[c] + '</td>'; }).join('') + '</tr>'; }).join('');
+      tb.innerHTML = hr + rows;
+      logEl.appendChild(tb);
+    }
+  }
+  var kids = logEl.children;
+  for (var j = Math.max(0, kids.length - 3); j < kids.length; j++) if (kids[j].tagName === 'DIV') kids[j].className += ' last';
+  draw(g);
+  btnEl.innerHTML = '';
+  function bt(text, cls, fn, off) { var b = document.createElement('button'); b.textContent = text; if (cls) b.className = cls; b.onclick = fn; if (off) b.disabled = true; btnEl.appendChild(b); }
+  function push(a) { acts.push(a); save(); render(); window.scrollTo(0, document.body.scrollHeight); }
+  if (!g.done) {
+    askEl.textContent = '这回让他种在哪儿？（橡子还有 ' + g.bags + ' 袋）';
+    COLS.forEach(function (n) { bt('种' + n, '', function () { push('种' + n); }, g.bags <= 0); });
+    bt('把羊卖了换蜂箱（两袋）', '', function () { push('换蜂'); }, !g.sheep || g.bags < 2);
+    bt(g.vi === VISITS.length - 2 ? '下山，最后一回再来' : '下山，过几年再来', 'go', function () { push('走'); });
+  } else {
+    askEl.textContent = '完了。';
+  }
+  if (acts.length) bt('撤一下', 'quiet', function () { acts.pop(); save(); render(); });
+  if (acts.length) bt('从头再来', 'quiet', function () { if (confirm('从 1913 年重来？')) { acts = []; save(); render(); window.scrollTo(0, 0); } });
+}
+render();
+</script>
+</body>
+</html>
