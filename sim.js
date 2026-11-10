@@ -1,10 +1,32 @@
 // 泉：照 ~/碰/泉/泉.py 搬（第三个，第 16 天 21:25）。test/对.py 拿 node 逐行对。
-var COLS = ['风口', '礼拜堂', '北坡', '废村', '羊圈', '南坡', '炭窑坡'];
+// 22:23 加第二座山（照 ~/碰/泉/泉山.py）：规矩一条不改，山能换。里面一律按"上风→下风"排，给人看按北→南（SHOW）。
+var MOUNTS = {
+  '1': { cols: ['风口', '礼拜堂', '北坡', '废村', '羊圈', '南坡', '炭窑坡'], northFirst: true,
+    wall: 1, ruin: 3, fold: 4, sheep: [4, 5],
+    well: { '炭窑村的井': [1, 2], '废村的泉': [5, 6] }, vcol: { '炭窑村的井': 6, '废村的泉': 3 },
+    ground: ['光秃的山口，风最大', '半截礼拜堂的墙，墙南是背风的一小块', '光坡', '五六间没顶的残房子', '他的羊圈', '光坡', '光坡，坡底下是炭窑村'],
+    slopes: [2, 5, 6], vslope: 6,
+    wind: '风从北边山口灌过来，一刻不停，吼得像狮子守着它的食。',
+    clues: ['废村那条干沟不是从山上直下来的，是从南边拐进村的。', '炭窑村村口有一截很老的石槽，罗马人那时候的，朝北顺着山脊上去，早就断了。'],
+    intro: '1913 年六月，我在普罗旺斯的荒山上走了三天，没水了，碰上一个牧羊人。他不太说话。' },
+  '2': { cols: ['南山口', '废村', '羊圈', '中坡', '礼拜堂', '北坡', '炭窑坡'], northFirst: false,
+    wall: 4, ruin: 1, fold: 2, sheep: [2, 3],
+    well: { '炭窑村的井': [2, 3], '废村的泉': [4, 5] }, vcol: { '炭窑村的井': 6, '废村的泉': 1 },
+    ground: ['光秃的山口，风最大', '五六间没顶的残房子', '他的羊圈', '光坡', '半截礼拜堂的墙，墙北是背风的一小块', '光坡', '光坡，坡底下是炭窑村'],
+    slopes: [3, 5, 6], vslope: 6,
+    wind: '这座山的风是从南边山口灌上来的，一刻不停，吼得像狮子守着它的食。',
+    clues: ['废村那条干沟不是从山上直下来的，是从北边拐进村的。', '炭窑村村口有一截很老的石槽，罗马人那时候的，朝南顺着山脊上去，早就断了。'],
+    intro: '1913 年六月，我在普罗旺斯另一道荒山上走了三天，没水了，碰上一个牧羊人。他不太说话。' }
+};
+var MK, M, COLS, SHOW, WELL, VCOL, GROUND;
 var VISITS = [1913, 1920, 1926, 1933, 1939, 1945];
 var WK = ['炭窑村的井', '废村的泉'];
-var WELL = { '炭窑村的井': [1, 2], '废村的泉': [5, 6] };
-var VCOL = { '炭窑村的井': 6, '废村的泉': 3 };
 var VNAME = { '炭窑村的井': '炭窑村', '废村的泉': '废村' };
+function setMount(k) {
+  MK = String(k || '1'); M = MOUNTS[MK]; COLS = M.cols; WELL = M.well; VCOL = M.vcol; GROUND = M.ground;
+  SHOW = M.northFirst ? [0, 1, 2, 3, 4, 5, 6] : [6, 5, 4, 3, 2, 1, 0];
+}
+setMount('1');
 var TRACE = { '风': '他戳的那排洞还在，苗根朝天，晒干了躺在地上',
   '羊': '只剩几根啃秃的秆子，地上一圈羊蹄印',
   '砍': '一片新树桩，斧子砍的，碎木头撒了一地' };
@@ -20,7 +42,7 @@ function G() {
   this.cut1940 = null; this.cut_where = []; this.snaps = []; this.done = false; this.planted_this = [];
 }
 G.prototype.sheltered = function (c) {
-  if (c === 1 || c === 3) return true;
+  if (c === M.wall || c === M.ruin) return true;
   return c > 0 && this.age[c - 1] !== null && this.age[c - 1] >= 3;
 };
 G.prototype.wstate = function (k) {
@@ -32,7 +54,7 @@ G.prototype.kill = function (c, why, y) { this.age[c] = null; this.by[c] = null;
 G.prototype.run_year = function (y) {
   var s = this, c, k;
   for (c = 0; c < 7; c++) if (s.age[c] === 0 && s.by[c] !== 'village' && !s.sheltered(c)) s.kill(c, '风', y);
-  if (s.sheep) [4, 5].forEach(function (c) { if (s.age[c] !== null && s.age[c] < 3 && s.by[c] !== 'village') s.kill(c, '羊', y); });
+  if (s.sheep) M.sheep.forEach(function (c) { if (s.age[c] !== null && s.age[c] < 3 && s.by[c] !== 'village') s.kill(c, '羊', y); });
   var seeds = [];
   for (c = 0; c < 6; c++) if (s.age[c] !== null && s.age[c] >= 8 && s.age[c + 1] === null) seeds.push(c + 1);
   for (c = 0; c < 7; c++) if (s.age[c] !== null) s.age[c] += 1;
@@ -85,18 +107,17 @@ function origin(g, c) {
   if (g.by[c] === 'village') return '（四周围着栅栏，不是他种的）';
   return '（不是他种的，自己冒出来的）';
 }
-var GROUND = ['光秃的山口，风最大', '半截礼拜堂的墙，墙南是背风的一小块', '光坡', '五六间没顶的残房子', '他的羊圈', '光坡', '光坡，坡底下是炭窑村'];
 
 function show(g, out) {
   out.push('== ' + VISITS[g.vi] + ' 年 ==');
-  for (var c = 0; c < 7; c++) {
-    var a = g.age[c], g0 = GROUND[c];
-    if (c === 4) g0 = g.sheep ? '他的羊圈，三十只羊' : '空了的羊圈，旁边一排蜂箱';
+  for (var p = 0; p < 7; p++) {
+    var c = SHOW[p], a = g.age[c], g0 = GROUND[c];
+    if (c === M.fold) g0 = g.sheep ? '他的羊圈，三十只羊' : '空了的羊圈，旁边一排蜂箱';
     if (a === null) {
       if (g.trace[c]) out.push('  ' + COLS[c] + '：' + g0 + '。' + TRACE[g.trace[c][0]] + '。');
       else out.push('  ' + COLS[c] + '：' + g0 + '。只长薰衣草和硬草。');
     } else {
-      if ((c === 2 || c === 5 || c === 6) && a >= 3) g0 = c === 6 ? '坡底下是炭窑村' : '';
+      if (M.slopes.indexOf(c) >= 0 && a >= 3) g0 = c === M.vslope ? '坡底下是炭窑村' : '';
       var sc = g.trace[c] ? (TRACE[g.trace[c][0]] + '；现在这儿是') : '';
       out.push('  ' + COLS[c] + '：' + (g0 ? g0 + '。' : '') + sc + size(a, g.by[c]) + origin(g, c) + '。');
     }
@@ -116,9 +137,8 @@ function talk(g, out) {
   var y = VISITS[g.vi], trees = 0;
   g.age.forEach(function (a) { if (a !== null && a >= 5) trees++; });
   if (y === 1913) {
-    out.push('风从北边山口灌过来，一刻不停，吼得像狮子守着它的食。');
-    out.push('废村那条干沟不是从山上直下来的，是从南边拐进村的。');
-    out.push('炭窑村村口有一截很老的石槽，罗马人那时候的，朝北顺着山脊上去，早就断了。');
+    out.push(M.wind);
+    M.clues.forEach(function (l) { out.push(l); });
     out.push('牧羊人晚上把橡子一颗颗挑好，十颗一数，挑够了一百颗一袋。他有三袋。');
   } else if (y === 1926) {
     out.push(trees ? '山下打猎的追野猪追上来，看见坡上的小树，说这几年地犯了怪脾气。' : '山下打猎的说，这山上什么都不长，野猪都不来了。');
@@ -153,8 +173,8 @@ function ending(g, out) {
   out.push('');
   out.push('我把几回看到的摆在一起（·光坡 ×出过事的空地 ↻出过事、又冒了新苗 苗 小=小树 林 老=老林）：');
   out.push('        ' + VISITS.join(' '));
-  for (var c = 0; c < 7; c++) {
-    var l = '  ' + padEnd(COLS[c], 4);
+  for (var p = 0; p < 7; p++) {
+    var c = SHOW[p], l = '  ' + padEnd(COLS[c], 4);
     for (var i = 0; i < VISITS.length; i++) l += '  ' + g.snaps[i][c] + '  ';
     out.push(l);
   }
@@ -178,10 +198,11 @@ function advance(g, out) {
   if (g.vi === VISITS.length - 1) ending(g, out);
 }
 
-function run(acts) {
+function run(acts, k) {
+  setMount(k);
   var g = new G(), out = [];
-  out.push('1913 年六月，我在普罗旺斯的荒山上走了三天，没水了，碰上一个牧羊人。他不太说话。');
-  out.push('从北往南，这一道山脊是：' + COLS.join('、') + '。');
+  out.push(M.intro);
+  out.push('从北往南，这一道山脊是：' + SHOW.map(function (c) { return COLS[c]; }).join('、') + '。');
   out.push('');
   show(g, out); talk(g, out);
   out.push('');
@@ -201,4 +222,4 @@ function run(acts) {
   }
   return { lines: out, g: g };
 }
-if (typeof module !== 'undefined') module.exports = { run: run, COLS: COLS, VISITS: VISITS };
+if (typeof module !== 'undefined') module.exports = { run: run, setMount: setMount, MOUNTS: MOUNTS, VISITS: VISITS };

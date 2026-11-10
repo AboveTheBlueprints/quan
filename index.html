@@ -46,10 +46,17 @@
 </div></div>
 <script src="sim.js"></script>
 <script>
+// 22:24 第三个加第二座山：?shan=2 或者玩完第一座点"去另一道山"；两座山各存各的。
+var mk0 = '1';
+try { var q = /[?&]shan=(\d)/.exec(location.search); mk0 = q ? q[1] : (localStorage.getItem('quan-mk') || '1'); } catch (e) {}
+if (!MOUNTS[mk0]) mk0 = '1';
+setMount(mk0);
+function skey() { return MK === '1' ? 'quan' : 'quan' + MK; }
 var acts = [];
-try { var s0 = JSON.parse(localStorage.getItem('quan') || 'null'); if (s0 && s0.acts) acts = s0.acts; } catch (e) {}
+function load() { acts = []; try { var s0 = JSON.parse(localStorage.getItem(skey()) || 'null'); if (s0 && s0.acts) acts = s0.acts; } catch (e) {} }
+load();
 var logEl = document.getElementById('log'), askEl = document.getElementById('ask'), btnEl = document.getElementById('btns'), svg = document.getElementById('hill');
-function save() { try { localStorage.setItem('quan', JSON.stringify({ acts: acts })); } catch (e) {} }
+function save() { try { localStorage.setItem(skey(), JSON.stringify({ acts: acts })); localStorage.setItem('quan-mk', MK); } catch (e) {} }
 function mk(tag, attrs, txt) { var e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (txt) e.textContent = txt; return e; }
 
 // 山脊：七格从左（北）到右（南），北高南低
@@ -64,31 +71,35 @@ function draw(g) {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
   svg.appendChild(mk('rect', { x: 0, y: 0, width: 680, height: 210, fill: '#e9e1c9' }));
   // 地
-  var d = 'M0 ' + gy(0);
-  for (var c = 0; c < 7; c++) d += ' L' + (X0 + c * W) + ' ' + gy(c) + ' L' + (X0 + (c + 1) * W) + ' ' + gy(c);
-  d += ' L680 ' + gy(6) + ' L680 210 L0 210 Z';
+  var d = 'M0 ' + gy(SHOW[0]), p, c;
+  for (p = 0; p < 7; p++) d += ' L' + (X0 + p * W) + ' ' + gy(SHOW[p]) + ' L' + (X0 + (p + 1) * W) + ' ' + gy(SHOW[p]);
+  d += ' L680 ' + gy(SHOW[6]) + ' L680 210 L0 210 Z';
   svg.appendChild(mk('path', { d: d, fill: '#cdbf98' }));
   // 风
+  var wg = mk('g', M.northFirst ? {} : { transform: 'translate(680,0) scale(-1,1)' });
   for (var w = 0; w < 3; w++) {
     var wy = 26 + w * 14;
-    svg.appendChild(mk('path', { d: 'M6 ' + wy + ' q 14 -5 28 0 q 10 4 18 0', stroke: '#9b9277', 'stroke-width': 1.5, fill: 'none' }));
-    svg.appendChild(mk('path', { d: 'M48 ' + (wy - 3) + ' l 5 3 l -5 3', stroke: '#9b9277', 'stroke-width': 1.5, fill: 'none' }));
+    wg.appendChild(mk('path', { d: 'M6 ' + wy + ' q 14 -5 28 0 q 10 4 18 0', stroke: '#9b9277', 'stroke-width': 1.5, fill: 'none' }));
+    wg.appendChild(mk('path', { d: 'M48 ' + (wy - 3) + ' l 5 3 l -5 3', stroke: '#9b9277', 'stroke-width': 1.5, fill: 'none' }));
   }
+  svg.appendChild(wg);
   svg.appendChild(mk('text', { x: 6, y: 16, 'font-size': 11, fill: '#7d745c' }, '北'));
   svg.appendChild(mk('text', { x: 664, y: 16, 'font-size': 11, fill: '#7d745c' }, '南'));
   // 每格
-  for (c = 0; c < 7; c++) {
-    var x = cx(c), y = gy(c), a = g.age[c];
+  for (p = 0; p < 7; p++) {
+    c = SHOW[p];
+    var x = cx(p), y = gy(c), a = g.age[c];
     svg.appendChild(mk('text', { x: x, y: y + 18, 'font-size': 12, fill: '#6e6550', 'text-anchor': 'middle' }, COLS[c]));
-    if (c === 1) { // 礼拜堂残墙
-      svg.appendChild(mk('rect', { x: x - W / 2 + 4, y: y - 26, width: 8, height: 26, fill: '#a39a86' }));
-      svg.appendChild(mk('path', { d: 'M' + (x - W / 2 + 4) + ' ' + (y - 26) + ' l 4 -10 l 4 10 Z', fill: '#a39a86' }));
+    if (c === M.wall) { // 礼拜堂残墙，立在上风那边
+      var wx = M.northFirst ? x - W / 2 + 4 : x + W / 2 - 12;
+      svg.appendChild(mk('rect', { x: wx, y: y - 26, width: 8, height: 26, fill: '#a39a86' }));
+      svg.appendChild(mk('path', { d: 'M' + wx + ' ' + (y - 26) + ' l 4 -10 l 4 10 Z', fill: '#a39a86' }));
     }
-    if (c === 3) { // 残房子
+    if (c === M.ruin) { // 残房子
       svg.appendChild(mk('path', { d: 'M' + (x - 36) + ' ' + y + ' v -16 h 14 v 10 h 3 v 6 Z', fill: '#b0a58c' }));
       svg.appendChild(mk('path', { d: 'M' + (x + 22) + ' ' + y + ' v -12 h 12 v 12 Z', fill: '#b0a58c' }));
     }
-    if (c === 4) {
+    if (c === M.fold) {
       if (g.sheep) {
         svg.appendChild(mk('path', { d: 'M' + (x - 38) + ' ' + (y - 8) + ' h 22 M' + (x - 38) + ' ' + (y - 3) + ' h 22', stroke: '#8a7d5e', 'stroke-width': 1.2 }));
         for (var s = 0; s < 5; s++) svg.appendChild(mk('ellipse', { cx: x - 34 + s * 4.5, cy: y - 5 - (s % 2) * 3, rx: 3, ry: 2.2, fill: '#f6f2e6', stroke: '#9a907a', 'stroke-width': 0.6 }));
@@ -116,24 +127,24 @@ function draw(g) {
   // 两口水
   var lv = function (k) { var n = 0; WELL[k].forEach(function (c) { if (g.age[c] !== null && g.age[c] >= 10) n++; }); return n; };
   var WC = ['#c9b78f', '#a08c66', '#6aa3b8'];
-  var px = cx(3), py = gy(3) + 34;
+  var fc = VCOL['废村的泉'], px = cx(SHOW.indexOf(fc)), py = gy(fc) + 34;
   svg.appendChild(mk('ellipse', { cx: px, cy: py, rx: 18, ry: 6, fill: WC[lv('废村的泉')] }));
   svg.appendChild(mk('text', { x: px, y: py + 20, 'font-size': 11, fill: '#6e6550', 'text-anchor': 'middle' }, '废村的泉'));
   if (lv('废村的泉') === 2) svg.appendChild(mk('path', { d: 'M' + (px + 18) + ' ' + py + ' q 20 4 40 14', stroke: '#6aa3b8', 'stroke-width': 2, fill: 'none' }));
   if (g.people['废村的泉']) { tree(px - 28, py + 2, 26, '#8fb36b'); svg.appendChild(mk('path', { d: 'M' + (px - 40) + ' ' + (py + 2) + ' h 24', stroke: '#8a7d5e', 'stroke-dasharray': '2 3' })); }
-  var kx = cx(6), ky = gy(6) + 44;
+  var kc = VCOL['炭窑村的井'], kx = cx(SHOW.indexOf(kc)), ky = gy(kc) + 44, td = M.northFirst ? -1 : 1;
   svg.appendChild(mk('rect', { x: kx - 10, y: ky - 6, width: 20, height: 9, rx: 2, fill: WC[lv('炭窑村的井')], stroke: '#8a7d5e', 'stroke-width': 0.8 }));
   svg.appendChild(mk('text', { x: kx, y: ky + 20, 'font-size': 11, fill: '#6e6550', 'text-anchor': 'middle' }, '炭窑村的井'));
-  // 石槽：从井往北
-  svg.appendChild(mk('path', { d: 'M' + (kx - 10) + ' ' + (ky - 2) + ' L' + (kx - 70) + ' ' + (ky - 8), stroke: '#a39a86', 'stroke-width': 3, 'stroke-dasharray': '10 6' }));
+  // 石槽：从井往上风那头（第一座往北，第二座往南）
+  svg.appendChild(mk('path', { d: 'M' + (kx + td * 10) + ' ' + (ky - 2) + ' L' + (kx + td * 70) + ' ' + (ky - 8), stroke: '#a39a86', 'stroke-width': 3, 'stroke-dasharray': '10 6' }));
   // 炭窑村的房子
   var hc = g.people['炭窑村的井'] ? '#c98f6a' : '#a8957a';
   for (s = 0; s < 3; s++) {
-    var hx = kx + 18 + s * 14;
+    var hx = td < 0 ? kx + 18 + s * 14 : kx - 29 - s * 14;
     svg.appendChild(mk('rect', { x: hx, y: ky - 10, width: 11, height: 9, fill: hc }));
     svg.appendChild(mk('path', { d: 'M' + (hx - 1) + ' ' + (ky - 10) + ' l 6.5 -5 l 6.5 5 Z', fill: '#7a6a52' }));
   }
-  if (g.people['炭窑村的井']) for (s = 0; s < 4; s++) svg.appendChild(mk('circle', { cx: kx - 30 + s * 6, cy: ky + 4, r: 2, fill: '#7fa36a' }));
+  if (g.people['炭窑村的井']) for (s = 0; s < 4; s++) svg.appendChild(mk('circle', { cx: kx + (td < 0 ? -30 : 12) + s * 6, cy: ky + 4, r: 2, fill: '#7fa36a' }));
   // 年份、橡子
   var yr = VISITS[Math.min(g.vi, VISITS.length - 1)];
   svg.appendChild(mk('text', { x: 340, y: 18, 'font-size': 15, fill: '#4f4630', 'text-anchor': 'middle', 'font-weight': 600 }, yr + ' 年'));
@@ -141,7 +152,7 @@ function draw(g) {
 }
 
 function render() {
-  var r = run(acts), g = r.g, lines = r.lines;
+  var r = run(acts, MK), g = r.g, lines = r.lines;
   logEl.innerHTML = '';
   var inTab = false;
   for (var i = 0; i < lines.length; i++) {
@@ -164,7 +175,7 @@ function render() {
       inTab = true;
       var tb = document.createElement('table'); tb.className = 'tab';
       var hr = '<tr><td></td>' + VISITS.map(function (y) { return '<th>' + y + '</th>'; }).join('') + '</tr>';
-      var rows = COLS.map(function (n, c) { return '<tr><th>' + n + '</th>' + g.snaps.map(function (sn) { return '<td>' + sn[c] + '</td>'; }).join('') + '</tr>'; }).join('');
+      var rows = SHOW.map(function (c) { return '<tr><th>' + COLS[c] + '</th>' + g.snaps.map(function (sn) { return '<td>' + sn[c] + '</td>'; }).join('') + '</tr>'; }).join('');
       tb.innerHTML = hr + rows;
       logEl.appendChild(tb);
     }
@@ -177,11 +188,13 @@ function render() {
   function push(a) { acts.push(a); save(); render(); window.scrollTo(0, document.body.scrollHeight); }
   if (!g.done) {
     askEl.textContent = '这回让他种在哪儿？（橡子还有 ' + g.bags + ' 袋）';
-    COLS.forEach(function (n) { bt('种' + n, '', function () { push('种' + n); }, g.bags <= 0); });
+    SHOW.forEach(function (c) { var n = COLS[c]; bt('种' + n, '', function () { push('种' + n); }, g.bags <= 0); });
     bt('把羊卖了换蜂箱（两袋）', '', function () { push('换蜂'); }, !g.sheep || g.bags < 2);
     bt(g.vi === VISITS.length - 2 ? '下山，最后一回再来' : '下山，过几年再来', 'go', function () { push('走'); });
   } else {
     askEl.textContent = '完了。';
+    if (MK === '1') bt('去另一道山', 'go', function () { setMount('2'); load(); save(); render(); window.scrollTo(0, 0); });
+    else bt('回第一道山', 'quiet', function () { setMount('1'); load(); save(); render(); window.scrollTo(0, 0); });
   }
   if (acts.length) bt('撤一下', 'quiet', function () { acts.pop(); save(); render(); });
   if (acts.length) bt('从头再来', 'quiet', function () { if (confirm('从 1913 年重来？')) { acts = []; save(); render(); window.scrollTo(0, 0); } });
